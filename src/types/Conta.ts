@@ -1,54 +1,38 @@
+import { Armazenador } from "./Armazenador.js";
+import { ValidarDebito, ValidarDeposito } from "./Decorators.js";
 import { GrupoTransacao } from "./GrupoTransacao.js";
-import { TipoTransacao } from "./TipoTransacao.js"
-import { Transacao } from "./Transacao.js"
+import { TipoTransacao } from "./TipoTransacao.js";
+import { Transacao } from "./Transacao.js";
 
-type ResumoTransacoes = {
-    totalDepositos: number;
-    totalTransferencias: number;
-    totalPagamentosBoleto: number;
-}
+export class Conta {
+    protected nome: string = '';
+    protected saldo: number = Armazenador.obter<number>("saldo") || 0;
+    private transacoes: Transacao[] = Armazenador.obter<Transacao[]>(("transacoes") as string, (key: string, value: any) => {
+        if (key === "data") {
+            return new Date(value);
+        }
+        return value;
+    }) || [];;
 
-let saldo: number = JSON.parse(localStorage.getItem("saldo") as string) || 0;
-
-const transacoes: Transacao[] = JSON.parse(localStorage.getItem("transacoes") as string, (key: string, value: string) => {
-    if (key === "data") {
-        return new Date(value);
+    constructor(nome: string) {
+        this.nome = nome;
     }
 
-    return value;
-}) || [];
-
-function debitar(valor: number): void {
-    if (valor <= 0){
-        throw new Error("O valor a ser debitado deve ser maior que zero!");
+    public getTitular() {
+        return this.nome;
     }
-    if (valor > saldo) {
-        throw new Error("Saldo insuficiente!");
+    
+    public getSaldo() {
+        return this.saldo;
     }
-    saldo -= valor;
-    localStorage.setItem("saldo", saldo.toString());
-}
 
-function depositar(valor: number): void {
-    if (valor <= 0){
-        throw new Error("O valor a ser depositado deve ser maior que zero!");
-    }
-    saldo += valor;
-    localStorage.setItem("saldo", saldo.toString());
-}
-
-const conta = {
-    getSaldo() {
-        return saldo;
-    },
-
-    getDataAcesso() {
+    public getDataAcesso() {
         return new Date();
-    },
+    }
 
-    getGruposTransacoes(): GrupoTransacao[] {
+    public getGruposTransacoes(): GrupoTransacao[] {
         const gruposTransacoes: GrupoTransacao[] = [];
-        const listaTransacoes: Transacao[] = structuredClone(transacoes);
+        const listaTransacoes: Transacao[] = structuredClone(this.transacoes);
         const transacoesOrdenadas: Transacao[] = listaTransacoes.sort((t1, t2) => t2.data.getTime() - t1.data.getTime());
 
         let labelAtualGrupoTransacao: string = "";
@@ -66,23 +50,48 @@ const conta = {
         }
 
         return gruposTransacoes;
-    },
+    }
 
-    registrarTrasacao(novaTrasacao: Transacao): void {
+    @ValidarDebito
+    private debitar(valor: number): void {
+        this.saldo -= valor;
+        Armazenador.salvar("saldo", this.saldo.toString());
+    }
+
+    @ValidarDeposito
+    private depositar(valor: number): void {
+        this.saldo += valor;
+        Armazenador.salvar("saldo", this.saldo.toString());
+    }
+
+    public registrarTransacao(novaTrasacao: Transacao): void {
         if (novaTrasacao.tipoTrasacao == TipoTransacao.DEPOSITO) {
-                depositar(novaTrasacao.valor);
+                this.depositar(novaTrasacao.valor);
             } else if (novaTrasacao.tipoTrasacao == TipoTransacao.TRANSFERENCIA || novaTrasacao.tipoTrasacao == TipoTransacao.PAGAMENTO_BOLETO) {
-                debitar(novaTrasacao.valor);
+                this.debitar(novaTrasacao.valor);
                 novaTrasacao.valor *= -1;
             } else {
                 throw new Error("Tipo de transação invalido!");
             }
 
-        transacoes.push(novaTrasacao)
+        this.transacoes.push(novaTrasacao)
         console.log(this.getGruposTransacoes())
-        localStorage.setItem("transacoes", JSON.stringify(transacoes))
-    },
+        Armazenador.salvar("transacoes", JSON.stringify(this.transacoes))
+    }
 
 }
 
-export default conta;
+export class ContaPremiun extends Conta {
+    registratTransacao(transacao: Transacao): void {
+        if (transacao.tipoTrasacao === TipoTransacao.DEPOSITO) {
+            console.log("ganhou um bônus de 0.50 centavos")
+            transacao.valor += 0.50
+        }
+        super.registrarTransacao(transacao)
+    }
+}
+
+const conta = new Conta("Douglas Candido da Silva")
+const contaPremiun = new ContaPremiun("Dougals Souza de Oliveira")
+
+export default conta
