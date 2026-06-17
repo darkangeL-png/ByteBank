@@ -70,8 +70,10 @@ Este projeto está sob licença MIT. Veja o arquivo LICENSE para mais detalhes.
 
 ## 👤 Autor
 
-[Seu Nome]
+DarkangeL-png
 
 ---
 
 Para mais informações, abra uma issue ou envie um pull request.
+
+Projeto feito com base nas aulas da Alura.
